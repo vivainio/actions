@@ -1,8 +1,10 @@
 # actions
 
-Reusable GitHub Action for publishing Python packages to PyPI.
+Reusable GitHub Actions for Python projects.
 
-## Usage
+## publish-pypi-full
+
+Checkout, build with uv, and publish to PyPI using trusted publishing.
 
 ```yaml
 name: Publish to PyPI
@@ -18,7 +20,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: vivainio/actions@main
+      - uses: vivainio/actions/publish-pypi-full@main
 ```
 
 Requires PyPI trusted publisher configured for your repo.
