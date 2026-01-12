@@ -23,4 +23,5 @@ runs:
       run: uv build
 
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      shell: bash
+      run: uv publish
