@@ -4,6 +4,9 @@ description: 'Build and publish Python package to PyPI using uv and trusted publ
 runs:
   using: 'composite'
   steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
     - name: Set version from release tag
       shell: bash
       run: |

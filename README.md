@@ -18,7 +18,6 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
       - uses: vivainio/actions@main
 ```
 
