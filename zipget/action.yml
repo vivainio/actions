@@ -1,0 +1,24 @@
+name: 'Run Zipget'
+description: 'Download zipget and run it against a recipe file'
+
+inputs:
+  recipe:
+    description: 'Path to the recipe file (TOML format)'
+    required: true
+  args:
+    description: 'Extra arguments to pass to zipget'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download zipget
+      shell: bash
+      run: |
+        curl -fsSL https://github.com/vivainio/zipget-rs/releases/latest/download/zipget-linux-x64-musl -o /usr/local/bin/zipget
+        chmod +x /usr/local/bin/zipget
+
+    - name: Run zipget recipe
+      shell: bash
+      run: zipget recipe ${{ inputs.recipe }} ${{ inputs.args }}
