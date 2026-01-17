@@ -1,0 +1,36 @@
+name: Test zipget action
+
+on:
+  push:
+    paths:
+      - 'zipget/**'
+      - '.github/workflows/test-zipget.yml'
+  pull_request:
+    paths:
+      - 'zipget/**'
+      - '.github/workflows/test-zipget.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create test recipe
+        run: |
+          cat > test-recipe.toml << 'EOF'
+          [bat]
+          github = { repo = "sharkdp/bat" }
+          unzip_to = "./tools"
+          EOF
+
+      - name: Run zipget action
+        uses: ./zipget
+        with:
+          recipe: test-recipe.toml
+
+      - name: Verify download
+        run: |
+          ls -la ./tools
+          test -f ./tools/bat && echo "bat binary found"
