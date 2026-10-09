@@ -47,6 +47,7 @@ jobs:
     environment: pypi
     permissions:
       id-token: write
+      actions: read
     steps:
       - uses: vivainio/actions/publish-pypi-artifacts@main
 ```
@@ -79,8 +80,10 @@ and pyproject.toml at the repository root and does not run package tests.
 
 Download `wheels-*` artifacts from the current workflow run, check that wheel
 or source distributions exist, and publish them through PyPI Trusted Publishing.
+Publishing uses `uv publish --trusted-publishing always`, which requires OIDC
+authentication and does not fall back to stored credentials.
 Use the local publishing job shown above; no checkout or API token is needed.
-The job must run on Linux, declare `id-token: write`, and use the environment
+The job must run on Linux, declare `id-token: write` and `actions: read`, and use the environment
 configured in its Trusted Publisher (the examples use `pypi`).
 
 Configure PyPI with the **app repository and its caller workflow filename**,
@@ -93,8 +96,11 @@ from reusable workflows. See [PyPI's reusable workflow limitation](https://docs.
 | --- | --- | --- |
 | `artifact-pattern` | `wheels-*` | Artifacts to download and merge |
 | `packages-dir` | `dist` | Download directory and publish source |
+| `run-id` | Current run | Download artifacts from an earlier run to retry publishing |
 | `repository-url` | `https://upload.pypi.org/legacy/` | Override for TestPyPI or another index |
 
 For TestPyPI, pass `repository-url: https://test.pypi.org/legacy/` and configure
 a Trusted Publisher there as well. Use a fresh publishing job directory so
 only the intended distributions are uploaded.
+
+The uv publisher currently uploads distributions without PEP 740 attestations.

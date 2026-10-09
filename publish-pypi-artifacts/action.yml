@@ -5,6 +5,9 @@ inputs:
   artifact-pattern:
     description: Artifact names to download from the current workflow run
     default: wheels-*
+  run-id:
+    description: Optional workflow run to download artifacts from when retrying publishing
+    default: ''
   packages-dir:
     description: Directory for downloaded distributions
     default: dist
@@ -18,6 +21,8 @@ runs:
     - name: Download distributions
       uses: actions/download-artifact@v4
       with:
+        run-id: ${{ inputs.run-id }}
+        github-token: ${{ github.token }}
         pattern: ${{ inputs.artifact-pattern }}
         merge-multiple: true
         path: ${{ inputs.packages-dir }}
@@ -33,8 +38,14 @@ runs:
         if not any(directory.glob('*.whl')) and not any(directory.glob('*.tar.gz')):
             raise SystemExit(f'No wheel or source distributions found in {directory}')
         PYTHON
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
     - name: Publish distributions
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: ${{ inputs.packages-dir }}
-        repository-url: ${{ inputs.repository-url }}
+      shell: bash
+      env:
+        PACKAGES_DIR: ${{ inputs.packages-dir }}
+        PUBLISH_URL: ${{ inputs.repository-url }}
+      run: |
+        shopt -s nullglob
+        distributions=("$PACKAGES_DIR"/*.whl "$PACKAGES_DIR"/*.tar.gz)
+        uv publish --trusted-publishing always --publish-url "$PUBLISH_URL" "${distributions[@]}"
