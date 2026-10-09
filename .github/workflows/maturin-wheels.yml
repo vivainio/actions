@@ -1,0 +1,125 @@
+name: Build maturin distributions
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Cargo version; defaults to the caller tag, with a leading v removed
+        type: string
+        default: ''
+      platforms:
+        description: desktop (Linux, Windows, macOS Intel and ARM) or linux
+        type: string
+        default: desktop
+      linux-arm64:
+        type: boolean
+        default: false
+      android:
+        type: boolean
+        default: false
+      sdist:
+        type: boolean
+        default: false
+      manylinux:
+        type: string
+        default: auto
+      maturin-version:
+        type: string
+        default: ''
+      build-args:
+        description: Additional maturin build arguments
+        type: string
+        default: ''
+      linux-cflags:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select platforms
+        id: matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+          LINUX_ARM64: ${{ inputs.linux-arm64 }}
+          ANDROID: ${{ inputs.android }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          platforms = os.environ['PLATFORMS']
+          if platforms not in ('desktop', 'linux'):
+              raise SystemExit('platforms must be desktop or linux')
+          entries = [{'os': 'ubuntu-latest', 'target': 'x86_64-unknown-linux-gnu'}]
+          if platforms == 'desktop':
+              entries += [
+                  {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc'},
+                  {'os': 'macos-latest', 'target': 'x86_64-apple-darwin'},
+                  {'os': 'macos-latest', 'target': 'aarch64-apple-darwin'},
+              ]
+          if os.environ['LINUX_ARM64'] == 'true':
+              entries.append({'os': 'ubuntu-24.04-arm', 'target': 'aarch64-unknown-linux-gnu'})
+          if os.environ['ANDROID'] == 'true':
+              entries.append({'os': 'ubuntu-24.04', 'target': 'aarch64-linux-android'})
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps({'include': entries}) + '\n')
+          PYTHON
+
+  wheels:
+    needs: configure
+    name: Wheel (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.configure.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set Cargo version
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          cargo install cargo-edit --locked
+          cargo set-version "${PACKAGE_VERSION#v}"
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        env:
+          CFLAGS: ${{ runner.os == 'Linux' && matrix.target != 'aarch64-linux-android' && inputs.linux-cflags || '' }}
+          ANDROID_API_LEVEL: '24'
+        with:
+          target: ${{ matrix.target }}
+          args: --release --locked --out dist ${{ inputs.build-args }}
+          manylinux: ${{ matrix.target == 'aarch64-linux-android' && 'off' || inputs.manylinux }}
+          maturin-version: ${{ inputs.maturin-version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    if: inputs.sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set Cargo version
+        env:
+          PACKAGE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          cargo install cargo-edit --locked
+          cargo set-version "${PACKAGE_VERSION#v}"
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+          maturin-version: ${{ inputs.maturin-version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error

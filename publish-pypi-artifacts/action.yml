@@ -1,0 +1,40 @@
+name: Publish PyPI artifacts
+description: Download built distributions and publish using the caller workflow's trusted publisher
+
+inputs:
+  artifact-pattern:
+    description: Artifact names to download from the current workflow run
+    default: wheels-*
+  packages-dir:
+    description: Directory for downloaded distributions
+    default: dist
+  repository-url:
+    description: Package index upload URL; defaults to PyPI
+    default: https://upload.pypi.org/legacy/
+
+runs:
+  using: composite
+  steps:
+    - name: Download distributions
+      uses: actions/download-artifact@v4
+      with:
+        pattern: ${{ inputs.artifact-pattern }}
+        merge-multiple: true
+        path: ${{ inputs.packages-dir }}
+    - name: Check distributions exist
+      shell: bash
+      env:
+        PACKAGES_DIR: ${{ inputs.packages-dir }}
+      run: |
+        python3 - <<'PYTHON'
+        import os
+        from pathlib import Path
+        directory = Path(os.environ['PACKAGES_DIR'])
+        if not any(directory.glob('*.whl')) and not any(directory.glob('*.tar.gz')):
+            raise SystemExit(f'No wheel or source distributions found in {directory}')
+        PYTHON
+    - name: Publish distributions
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: ${{ inputs.packages-dir }}
+        repository-url: ${{ inputs.repository-url }}
